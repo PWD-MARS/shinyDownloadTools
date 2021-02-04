@@ -1,52 +1,54 @@
 #Fetch rainfall from MARS database
 
-#shiny
-library(shiny)
-#shiny themes for color 
-library(shinythemes)
-#pwdgsi for fetching rainfall data
-library(pwdgsi)
-#tidyverse for data manipulation 
-library(tidyverse)
-#pool for database connections
-library(pool)
-#odbc for database connection
-library(odbc)
-#easy javascript commands
-library(shinyjs)
-#load extra shiny widgets
-library(shinyWidgets)
-
-options(stringsAsFactors=FALSE)
-
+  #shiny
+  library(shiny)
+  #shiny themes for color 
+  library(shinythemes)
+  #pwdgsi for fetching rainfall data
+  library(pwdgsi)
+  #tidyverse for data manipulation 
+  library(tidyverse)
+  #pool for database connections
+  library(pool)
+  #odbc for database connection
+  library(odbc)
+  #easy javascript commands
+  library(shinyjs)
+  #load extra shiny widgets
+  library(shinyWidgets)
+  #work with dates
+  library(lubridate)
+  
+  options(stringsAsFactors=FALSE)
+  
 #set up
-
-#set db connection
-#using a pool connection so separate connections are unified
-#gets environmental variables saved in local or pwdrstudio environment
-poolConn <- dbPool(odbc(), dsn = "mars_testing", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
-
-#disconnect from db on stop 
-onStop(function(){
-  poolClose(poolConn)
-})
-
-#js warning about leaving page
-#jscode <- 'window.onbeforeunload = function() { return "Please use the button on the webpage"; };'
-
-#define global variables that will be required each time the UI runs
-#query all SMP IDs
-smp_id <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from smp_loc")) %>% 
-  dplyr::arrange(smp_id) %>% 
-  dplyr::pull()
-
-#min_rainfall_date <- '1990-01-01'
-max_rainfall_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("select max(dtime_edt) from public.rainfall_gage where dtime_edt > '2020-09-30'")) %>% pull)
-
-max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime_est) FROM public.barodata_neighbors where dtime_est > '2020-11-01'
-")) %>% pull)
-
-max_date = max(c(max_rainfall_date, max_baro_date))
+  
+  #set db connection
+  #using a pool connection so separate connections are unified
+  #gets environmental variables saved in local or pwdrstudio environment
+  poolConn <- dbPool(odbc(), dsn = "mars_testing", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+  
+  #disconnect from db on stop 
+  onStop(function(){
+    poolClose(poolConn)
+  })
+  
+  #js warning about leaving page
+  #jscode <- 'window.onbeforeunload = function() { return "Please use the button on the webpage"; };'
+  
+  #define global variables that will be required each time the UI runs
+  #query all SMP IDs
+  smp_id <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from smp_loc")) %>% 
+    dplyr::arrange(smp_id) %>% 
+    dplyr::pull()
+  
+  #min_rainfall_date <- '1990-01-01'
+  max_rainfall_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("select max(dtime_edt) from public.rainfall_gage where dtime_edt > '2020-09-30'")) %>% pull)
+  
+  max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime_est) FROM public.barodata_neighbors where dtime_est > '2020-11-01'
+  ")) %>% pull)
+  
+  max_date = max(c(max_rainfall_date, max_baro_date))
 
 ui <- fluidPage(theme = shinytheme("cerulean"),
                 titlePanel("MARS Fetch Rainfall & Baro Data"),
@@ -59,7 +61,7 @@ ui <- fluidPage(theme = shinytheme("cerulean"),
                   selectInput("interval", "Interval (min)", choices = c("", 5, 15), selected = NULL)
                   ), 
                 conditionalPanel(condition = 'input.data_type == 1', 
-                  checkboxInput("dst", "Daylight Saving")
+                  checkboxInput("dst", "Daylight Saving (leave unchecked if doing QA/QC)")
                   ), 
                 conditionalPanel(condition = 'input.data_type == 1', 
                   actionButton("rainfall_data", "Get Rainfall Data"), 
@@ -96,6 +98,9 @@ server <- function(input, output, session){
   
   observe(updateAirDateInput(session, "daterange", options = list(maxDate = rv$max_date())))
   
+  rv$start_date <- reactive(lubridate::ymd(input$daterange[1], tz = "EST"))
+  rv$end_date <- reactive(lubridate::ymd(input$daterange[2], tz = "EST"))
+  
   observeEvent(input$data_type, {
     if(length(input$data_type) > 0 & length(input$daterange[2]) > 0){
     if(input$daterange[2] > rv$max_date()){
@@ -103,6 +108,10 @@ server <- function(input, output, session){
     }
     }
     })
+  
+  
+  #update interval to say "mins"
+  rv$interval <- reactive(paste(input$interval, "mins"))
   
   #toggle state (enable/disable)
   rainfall_go <- reactive(nchar(input$smp_id) > 0 & length(input$daterange[1]) > 0 & length(input$daterange[2]) > 0)
@@ -157,15 +166,16 @@ server <- function(input, output, session){
   #click "get baro data"
   observeEvent(input$baro_data, {
     
-    #fetch baro data. this also generates a report at a predetermined network location. because how it used to be and that's how I'm leaving it (for now)
+    #fetch baro data
+    #why is it only getting first day ugh 
     rv$barodata <- marsFetchBaroData(con = poolConn, 
                                   target_id = input$smp_id, 
-                                  start_date = input$daterange[1], 
-                                  end_date = input$daterange[2], 
-                                  data_interval = input$interval
+                                  start_date = rv$start_date(), 
+                                  end_date = rv$end_date(), 
+                                  data_interval = rv$interval()
     ) 
     
-    rv$baro_header <-  paste("Barometric pressure data found for", input$smp_id, "from", input$daterange[1], "to", input$daterange[2], " has been generated. A markdown report is at O:\\Watershed Sciences\\GSI Monitoring\\07 Databases and Tracking Spreadsheets\\13 MARS Analysis Database\\Scripts\\Downloader\\Baro Data Downloader\\Reports")
+    rv$baro_header <-  paste("Barometric pressure data found for", input$smp_id, "from", input$daterange[1], "to", input$daterange[2], " has been generated.")
     
     #render header
     output$baro_title <- renderText(
