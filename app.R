@@ -1,5 +1,7 @@
 #Fetch rainfall from MARS database
 
+  #0 set up ------
+  #0.0 load libraries -----
   #shiny
   library(shiny)
   #shiny themes for color 
@@ -21,9 +23,7 @@
   
   options(stringsAsFactors=FALSE)
   
-#set up
-  
-  #set db connection
+  #0.1 set db connection -------
   #using a pool connection so separate connections are unified
   #gets environmental variables saved in local or pwdrstudio environment
   poolConn <- dbPool(odbc(), dsn = "mars_testing", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
@@ -36,6 +36,7 @@
   #js warning about leaving page
   #jscode <- 'window.onbeforeunload = function() { return "Please use the button on the webpage"; };'
   
+  #0.2 global variables -------
   #define global variables that will be required each time the UI runs
   #query all SMP IDs
   smp_id <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from smp_loc")) %>% 
@@ -50,30 +51,33 @@
   
   max_date = max(c(max_rainfall_date, max_baro_date))
 
+#1.0 UI --------
 ui <- fluidPage(theme = shinytheme("cerulean"),
                 titlePanel("MARS Fetch Rainfall & Baro Data"),
+                #1.1 SidebarPanel --------
                 sidebarPanel(
                   selectInput("smp_id", "SMP ID", choices = c("", smp_id), selected = NULL), 
                   selectInput("data_type", "Data Type", choices = c("", "Rainfall" = 1, "Baro" = 2), selected = NULL),
                   airDatepickerInput("daterange", "Date Range", range = TRUE),#maxDate = max_date),
-                verbatimTextOutput("res"),
-                conditionalPanel(condition = 'input.data_type == 2',
-                  selectInput("interval", "Interval (min)", choices = c("", 5, 15), selected = NULL)
-                  ), 
-                conditionalPanel(condition = 'input.data_type == 1', 
-                  checkboxInput("dst", "Daylight Saving (leave unchecked if doing QA/QC)")
-                  ), 
-                conditionalPanel(condition = 'input.data_type == 1', 
-                  actionButton("rainfall_data", "Get Rainfall Data"), 
-                  disabled(downloadButton("dl_rainfall", "Download Rainfall .csv"))
-                  ), 
-                conditionalPanel(condition = 'input.data_type == 2', 
-                  actionButton("baro_data", "Get Baro Data"), 
-                  #disabled(downloadButton("dl_baro_report", "Download Baro Report")), 
-                  disabled(downloadButton("dl_baro_data", "Download Baro .csv"))
-                  ) 
+                  verbatimTextOutput("res"),
+                  conditionalPanel(condition = 'input.data_type == 2',
+                    selectInput("interval", "Interval (min)", choices = c("", 5, 15), selected = NULL)
+                    ), 
+                  conditionalPanel(condition = 'input.data_type == 1', 
+                    checkboxInput("dst", "Daylight Saving (leave unchecked if doing QA/QC)")
+                    ), 
+                  conditionalPanel(condition = 'input.data_type == 1', 
+                    actionButton("rainfall_data", "Get Rainfall Data"), 
+                    disabled(downloadButton("dl_rainfall", "Download Rainfall .csv"))
+                    ), 
+                  conditionalPanel(condition = 'input.data_type == 2', 
+                    actionButton("baro_data", "Get Baro Data"), 
+                    #disabled(downloadButton("dl_baro_report", "Download Baro Report")), 
+                    disabled(downloadButton("dl_baro_data", "Download Baro .csv"))
+                    ) 
                   ),
-                useShinyjs(), 
+                useShinyjs(),
+                #1.2 Text Outputs -------
                 mainPanel(
                   #create a header to let user know that the data was retrieved/generated. 
                   h4(textOutput("rainfall_title")), 
@@ -81,8 +85,10 @@ ui <- fluidPage(theme = shinytheme("cerulean"),
                 )
                 )
 
+  #2.0 Server -------
 server <- function(input, output, session){
   
+  #2.0.1 Initial set up --------
   #establish rv for reactive values
   rv <- reactiveValues()
   
@@ -98,9 +104,11 @@ server <- function(input, output, session){
   
   observe(updateAirDateInput(session, "daterange", options = list(maxDate = rv$max_date())))
   
+  #2.1 sanitize/prepare inputs ------
   rv$start_date <- reactive(lubridate::ymd(input$daterange[1], tz = "EST"))
   rv$end_date <- reactive(lubridate::ymd(input$daterange[2], tz = "EST"))
   
+  #update date ranges when switching data type
   observeEvent(input$data_type, {
     if(length(input$data_type) > 0 & length(input$daterange[2]) > 0){
     if(input$daterange[2] > rv$max_date()){
@@ -109,10 +117,10 @@ server <- function(input, output, session){
     }
     })
   
-  
   #update interval to say "mins"
   rv$interval <- reactive(paste(input$interval, "mins"))
   
+  #2.2 toggle states based on inputs -----
   #toggle state (enable/disable)
   rainfall_go <- reactive(nchar(input$smp_id) > 0 & length(input$daterange[1]) > 0 & length(input$daterange[2]) > 0)
   
@@ -123,6 +131,7 @@ server <- function(input, output, session){
   
   observe(toggleState(id = "baro_data", condition = baro_go()))
   
+  #2.3 get rainfall data button ------
   #when you click get rainfall data
   observeEvent(input$rainfall_data, {
     
@@ -152,6 +161,7 @@ server <- function(input, output, session){
     
   })
   
+  #2.4 download rainfall ------
   #when you click "download rainfall"
   output$dl_rainfall <- downloadHandler(
     filename = function(){
@@ -163,7 +173,8 @@ server <- function(input, output, session){
     }
   )
   
-  #click "get baro data"
+  
+  #2.5 click "get baro data" button ----
   observeEvent(input$baro_data, {
     
     #fetch baro data
@@ -187,6 +198,7 @@ server <- function(input, output, session){
     
   })
   
+  #2.6 download baro data -----
   output$dl_baro_data <- downloadHandler(
     filename = function(){
       paste(input$smp_id, input$daterange[1], "to", input$daterange[2], "baro.csv", sep = "_")
@@ -199,6 +211,7 @@ server <- function(input, output, session){
   
   
 }
-            
+
+#3.0 shiny runApp --------           
 #Run this function to run the app!
 shinyApp(ui, server)    
