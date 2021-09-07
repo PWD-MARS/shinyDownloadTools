@@ -38,16 +38,13 @@
   
   #0.2 global variables -------
   #define global variables that will be required each time the UI runs
-  #query all SMP IDs
-  smp_id <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from smp_loc")) %>% 
-    dplyr::arrange(smp_id) %>% 
-    dplyr::pull()
+  
+  refer_date <- today() %m-% months(2)
   
   #min_rainfall_date <- '1990-01-01'
-  max_rainfall_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("select max(dtime_edt) from public.rainfall_gage where dtime_edt > '2020-09-30'")) %>% pull)
+  max_rainfall_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("select max(dtime_edt) from public.rainfall_gage where dtime_edt > ',", refer_date, "'")) %>% pull)
   
-  max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime_est) FROM public.barodata_neighbors where dtime_est > '2020-11-01'
-  ")) %>% pull)
+  max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime_est) FROM public.barodata_neighbors where dtime_est > ',", refer_date, "'")) %>% pull)
   
   max_date = max(c(max_rainfall_date, max_baro_date))
 
@@ -56,7 +53,13 @@ ui <- fluidPage(theme = shinytheme("cerulean"),
                 titlePanel("MARS Fetch Rainfall & Baro Data"),
                 #1.1 SidebarPanel --------
                 sidebarPanel(
-                  selectInput("smp_id", "SMP ID", choices = c("", smp_id), selected = NULL), 
+                  selectizeInput("smp_id", "SMP ID", 
+                                 choices = NULL, 
+                                 options = list(
+                                   placeholder = 'Select an Option', 
+                                   onInitialize = I('function() { this.setValue(""); }')
+                                 )),
+                 # selectInput("smp_id", "SMP ID", choices = c("", smp_id), selected = NULL), 
                   selectInput("data_type", "Data Type", choices = c("", "Rainfall" = 1, "Baro" = 2), selected = NULL),
                   airDatepickerInput("daterange", "Date Range", range = TRUE),#maxDate = max_date),
                   verbatimTextOutput("res"),
@@ -91,6 +94,15 @@ server <- function(input, output, session){
   #2.0.1 Initial set up --------
   #establish rv for reactive values
   rv <- reactiveValues()
+  
+  #query all SMP IDs
+  smp_id <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from smp_loc")) %>% 
+    dplyr::arrange(smp_id) %>% 
+    dplyr::pull()
+  
+  #updates smp ids
+  updateSelectizeInput(session, "smp_id", choices = smp_id, selected = character(0), server = TRUE)
+  
   
   #set end date depending on rainfall or baro
   
@@ -136,8 +148,9 @@ server <- function(input, output, session){
   observeEvent(input$rainfall_data, {
     
     #marsFetchRainGageData
-    rv$rainfall_data <- marsFetchRainGageData(con = poolConn, 
+    rv$rainfall_data <- marsFetchRainfallData(con = poolConn, 
                                           target_id = input$smp_id, 
+                                          source = "gage",
                                           start_date = input$daterange[1], 
                                           end_date = input$daterange[2], 
                                           daylightsavings = input$dst)
