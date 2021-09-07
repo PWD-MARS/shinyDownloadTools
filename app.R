@@ -26,7 +26,7 @@
   #0.1 set db connection -------
   #using a pool connection so separate connections are unified
   #gets environmental variables saved in local or pwdrstudio environment
-  poolConn <- dbPool(odbc(), dsn = "mars_testing", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+  poolConn <- dbPool(odbc(), dsn = "mars_data", uid = Sys.getenv("new_shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
   
   #disconnect from db on stop 
   onStop(function(){
@@ -42,9 +42,9 @@
   refer_date <- today() %m-% months(2)
   
   #min_rainfall_date <- '1990-01-01'
-  max_rainfall_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("select max(dtime_edt) from public.rainfall_gage where dtime_edt > ',", refer_date, "'")) %>% pull)
+  max_rainfall_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("select max(dtime_edt) from data.gage_rain where dtime_edt > ',", refer_date, "'")) %>% pull)
   
-  max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime_est) FROM public.barodata_neighbors where dtime_est > ',", refer_date, "'")) %>% pull)
+  max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime_est) FROM data.barodata_neighbors where dtime_est > ',", refer_date, "'")) %>% pull)
   
   max_date = max(c(max_rainfall_date, max_baro_date))
 
@@ -61,7 +61,7 @@ ui <- fluidPage(theme = shinytheme("cerulean"),
                                  )),
                  # selectInput("smp_id", "SMP ID", choices = c("", smp_id), selected = NULL), 
                   selectInput("data_type", "Data Type", choices = c("", "Rainfall" = 1, "Baro" = 2), selected = NULL),
-                  airDatepickerInput("daterange", "Date Range", range = TRUE),#maxDate = max_date),
+                  airDatepickerInput("daterange", "Date Range", range = TRUE),
                   verbatimTextOutput("res"),
                   conditionalPanel(condition = 'input.data_type == 2',
                     selectInput("interval", "Interval (min)", choices = c("", 5, 15), selected = NULL)
@@ -79,6 +79,7 @@ ui <- fluidPage(theme = shinytheme("cerulean"),
                     disabled(downloadButton("dl_baro_data", "Download Baro .csv"))
                     ) 
                   ),
+                actionButton("print_check", "Print check"),
                 useShinyjs(),
                 #1.2 Text Outputs -------
                 mainPanel(
@@ -96,13 +97,20 @@ server <- function(input, output, session){
   rv <- reactiveValues()
   
   #query all SMP IDs
-  smp_id <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from smp_loc")) %>% 
+  smp_id <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from admin.smp_loc")) %>% 
     dplyr::arrange(smp_id) %>% 
     dplyr::pull()
   
   #updates smp ids
   updateSelectizeInput(session, "smp_id", choices = smp_id, selected = character(0), server = TRUE)
   
+  observeEvent(input$print_check, {
+    print(paste("refer_date = ", refer_date))
+    print(paste("rv$max_date = ", rv$max_date()))
+    print(paste("max_date =", max_date))
+    print(paste("max_rainfall_date =", max_rainfall_date))
+    print(paste("max_baro_date =", max_baro_date))
+  })
   
   #set end date depending on rainfall or baro
   
@@ -113,6 +121,8 @@ server <- function(input, output, session){
   }else if(input$data_type == 2){
     max_baro_date
   })
+  
+  
   
   observe(updateAirDateInput(session, "daterange", options = list(maxDate = rv$max_date())))
   
