@@ -79,7 +79,6 @@ ui <- fluidPage(theme = shinytheme("cerulean"),
                     disabled(downloadButton("dl_baro_data", "Download Baro .csv"))
                     ) 
                   ),
-                actionButton("print_check", "Print check"),
                 useShinyjs(),
                 #1.2 Text Outputs -------
                 mainPanel(
@@ -103,14 +102,6 @@ server <- function(input, output, session){
   
   #updates smp ids
   updateSelectizeInput(session, "smp_id", choices = smp_id, selected = character(0), server = TRUE)
-  
-  observeEvent(input$print_check, {
-    print(paste("refer_date = ", refer_date))
-    print(paste("rv$max_date = ", rv$max_date()))
-    print(paste("max_date =", max_date))
-    print(paste("max_rainfall_date =", max_rainfall_date))
-    print(paste("max_baro_date =", max_baro_date))
-  })
   
   #set end date depending on rainfall or baro
   
