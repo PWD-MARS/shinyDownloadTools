@@ -42,9 +42,9 @@
   refer_date <- today() %m-% months(2)
   
   #min_rainfall_date <- '1990-01-01'
-  max_rainfall_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("select max(dtime_edt) from public.rainfall_gage where dtime_edt > ',", refer_date, "'")) %>% pull)
+  max_rainfall_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("select max(dtime_edt) from public.rainfall_gage where dtime_edt > '", refer_date, "'")) %>% pull)
   
-  max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime_est) FROM public.barodata_neighbors where dtime_est > ',", refer_date, "'")) %>% pull)
+  max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime_est) FROM public.barodata_neighbors where dtime_est > '", refer_date, "'")) %>% pull)
   
   max_date = max(c(max_rainfall_date, max_baro_date))
 
