@@ -27,6 +27,7 @@
   #using a pool connection so separate connections are unified
   #gets environmental variables saved in local or pwdrstudio environment
   poolConn <- dbPool(odbc(), dsn = "mars_data", uid = Sys.getenv("new_shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+  # poolConn <- dbPool(odbc(), dsn = "mars_data")
   
   #disconnect from db on stop 
   onStop(function(){
@@ -38,13 +39,14 @@
   
   #0.2 global variables -------
   #define global variables that will be required each time the UI runs
-  
+
   refer_date <- today() %m-% months(2)
+
   
   #min_rainfall_date <- '1990-01-01'
-  max_rainfall_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("select max(dtime_edt) from data.gage_rain where dtime_edt > ',", refer_date, "'")) %>% pull)
+  max_rainfall_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("select max(dtime_edt) from data.gage_rain where dtime_edt > '", refer_date, "'")) %>% pull)
   
-  max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime_est) FROM data.barodata_neighbors where dtime_est > ',", refer_date, "'")) %>% pull)
+  max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime_est) FROM data.barodata_neighbors where dtime_est > '", refer_date, "'")) %>% pull)
   
   max_date = max(c(max_rainfall_date, max_baro_date))
 
@@ -94,6 +96,24 @@ server <- function(input, output, session){
   #2.0.1 Initial set up --------
   #establish rv for reactive values
   rv <- reactiveValues()
+  
+  #check for max dates out of range
+  if(is.na(max_rainfall_date)){
+    rain_error <- "The latest rainfall data is 2 months or older and must be updated."
+    rv$rainfall_header <- rain_error
+    output$rainfall_title <- renderText(
+      rv$rainfall_header
+    )
+  }
+  
+  if(is.na(max_baro_date)){
+    baro_error <- "The latest barometric pressure data is 2 months or older and must be updated."
+    rv$baro_header <- baro_error
+    output$baro_title <- renderText(
+      rv$baro_header
+    ) 
+    
+  }
   
   #query all SMP IDs
   smp_id <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from admin.smp_loc")) %>% 
