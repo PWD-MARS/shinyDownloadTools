@@ -26,7 +26,7 @@
   #0.1 set db connection -------
   #using a pool connection so separate connections are unified
   #gets environmental variables saved in local or pwdrstudio environment
-  poolConn <- dbPool(odbc(), dsn = "mars_data_pg14", uid = Sys.getenv("new_shiny_uid"), pwd = Sys.getenv("new_shiny_pwd"))
+  poolConn <- dbPool(odbc(), dsn = "mars14_data", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
   
   #disconnect from db on stop 
   onStop(function(){
