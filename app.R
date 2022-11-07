@@ -26,7 +26,7 @@
   #0.1 set db connection -------
   #using a pool connection so separate connections are unified
   #gets environmental variables saved in local or pwdrstudio environment
-  poolConn <- dbPool(odbc(), dsn = "mars_testing", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+  poolConn <- dbPool(odbc(), dsn = "mars14_data", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
   
   #disconnect from db on stop 
   onStop(function(){
@@ -43,9 +43,9 @@
 
   
   #min_rainfall_date <- '1990-01-01'
-  max_rainfall_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("select max(dtime_edt) from public.rainfall_gage where dtime_edt > '", refer_date, "'")) %>% pull)
+  max_rainfall_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("select max(dtime_edt) from data.tbl_gage_rain where dtime_edt > '", refer_date, "'")) %>% pull)
   
-  max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime_est) FROM public.barodata_neighbors where dtime_est > '", refer_date, "'")) %>% pull)
+  max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime_est) FROM data.viw_barodata_neighbors where dtime_est > '", refer_date, "'")) %>% pull)
 
   max_date = max(c(max_rainfall_date, max_baro_date))
   
@@ -118,7 +118,7 @@ server <- function(input, output, session){
 
   
   #query all SMP IDs
-  smp_id <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from smp_loc")) %>% 
+  smp_id <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from admin.tbl_smp_loc")) %>% 
     dplyr::arrange(smp_id) %>% 
     dplyr::pull()
   
@@ -168,7 +168,8 @@ server <- function(input, output, session){
   #2.3 get rainfall data button ------
   #when you click get rainfall data
   observeEvent(input$rainfall_data, {
-    
+    # making sure marsFetchRainfallData works properly
+    # browser()
     #marsFetchRainGageData
     rv$rainfall_data <- marsFetchRainfallData(con = poolConn, 
                                           target_id = input$smp_id, 
