@@ -102,20 +102,26 @@ server <- function(input, output, session){
   if(is.na(max_rainfall_date)){
     rain_error <- "The latest rainfall data is 2 months or older and must be updated."
     rv$rainfall_header <- rain_error
-    output$rainfall_title <- renderText(
-      rv$rainfall_header
-    )
+    output$rainfall_title <- renderText(rv$rainfall_header)
+  } else {
+    # based on current logs structure milestones greater than 5 mean that gage data has been retrieved properly and have moved on to radar
+    rainfall_log <- dbGetQuery(poolConn, "select max(date) from log.tbl_script_rainfall where milestone > 5") %>% pull
+    rv$rainfall_header <- paste0("Rainfall data was last updated on: ", as.Date(rainfall_log), ". The latest value is from: ",max_rainfall_date,".")
+    # output$rainfall_title <- renderText(rv$rainfall_header)
   }
+  
+  
   
    if(is.na(max_baro_date)){
     baro_error <- "The latest barometric pressure data is 2 months or older and must be updated."
     rv$baro_header <- baro_error
-    output$baro_title <- renderText(
-      rv$baro_header
-    ) 
-    
-  }
-
+    output$baro_title <- renderText(rv$baro_header)
+   } else{
+     baro_log <- dbGetQuery(poolConn, "select max(date) from log.tbl_script_baro where exit_code = 0") %>% pull
+     rv$baro_header <- paste0("Barometric data was last updated on: ",as.Date(baro_log) , ". The latest value is from: ",max_baro_date,".")
+     # output$baro_title <- renderText(rv$baro_header)
+   }
+  
   
   #query all SMP IDs
   smp_id <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from admin.tbl_smp_loc")) %>% 
@@ -142,13 +148,21 @@ server <- function(input, output, session){
   rv$start_date <- reactive(lubridate::ymd(input$daterange[1], tz = "EST"))
   rv$end_date <- reactive(lubridate::ymd(input$daterange[2], tz = "EST"))
   
-  #update date ranges when switching data type
+  #update date ranges and header when switching data type
   observeEvent(input$data_type, {
-    if(length(input$data_type) > 0 & length(input$daterange[2]) > 0){
-    if(input$daterange[2] > rv$max_date()){
-     updateAirDateInput(session, "daterange", clear = TRUE)
-    }
-    }
+      if(length(input$data_type) > 0 & length(input$daterange[2]) > 0){
+        if(input$daterange[2] > rv$max_date()){
+         updateAirDateInput(session, "daterange", clear = TRUE)
+        }
+      }
+      if(input$data_type == 1){
+        output$rainfall_title <- renderText(rv$rainfall_header)
+        output$baro_title <- renderText("")
+      }
+      if(input$data_type == 2){
+        output$baro_title <- renderText(rv$baro_header)
+        output$rainfall_title <- renderText("")
+      }
     })
   
   #update interval to say "mins"
