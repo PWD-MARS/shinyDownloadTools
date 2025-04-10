@@ -1,0 +1,12 @@
+name: shinydownloadtools
+title: shinyDownloadTools
+username: Jonathan.Bryant
+account: Jonathan.Bryant
+server: pwdrstudio.phila.gov
+hostUrl: https://pwdrstudio.phila.gov/__api__
+appId: 456
+bundleId: 3082
+url: https://pwdrstudio.phila.gov/content/e9a0a563-d544-45fa-b8e9-8602d637c356/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
