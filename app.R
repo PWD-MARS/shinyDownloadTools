@@ -39,7 +39,8 @@ max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime) FR
 #### Why is this needed?
 max_date = max(c(max_rainfall_date, max_baro_date))
 
-test1 <- NA
+NY <- NA
+EST <- NA
 
 
 # UI
@@ -200,10 +201,11 @@ server <- function(input, output, session){
                                               start_date = input$daterange[1], 
                                               end_date = input$daterange[2], 
                                               daylightsavings = input$dst)
+  NY <<- rainfall_data
+  # Moving America/New_York to EST because 
   rv$rainfall_data <- rainfall_data |> 
     mutate(dtime = with_tz(dtime, tz = "EST"))
-  test1 <<- rv$rainfall_data 
-  dplyr::glimpse(attributes(rv$rainfall_data$dtime))
+  EST <<- rv$rainfall_data
   
     
   # Update header depending on whether rainfall generated properly
