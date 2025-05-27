@@ -196,27 +196,26 @@ server <- function(input, output, session){
   observeEvent(input$rainfall_data, {
   #### Does this need to be stored in a reactiveValues()?
   rainfall_data <- marsFetchRainfallData(con = poolConn, 
-                                              target_id = input$smp_id, 
-                                              source = "gage",
-                                              start_date = input$daterange[1], 
-                                              end_date = input$daterange[2], 
-                                              daylightsavings = input$dst)
-  NY <<- rainfall_data
-  # Moving America/New_York to EST because 
+                                         target_id = input$smp_id, 
+                                         source = "gage",
+                                         start_date = input$daterange[1], 
+                                         end_date = input$daterange[2], 
+                                         daylightsavings = input$dst)
+  
+  # Moving America/New_York to EST to match baro CSV files for QAQC
   rv$rainfall_data <- rainfall_data |> 
     mutate(dtime = with_tz(dtime, tz = "EST"))
-  EST <<- rv$rainfall_data
   
-    
   # Update header depending on whether rainfall generated properly
   #### This should be one button with an error message to alert the user
-  rv$rainfall_header <- if(nrow(rv$rainfall_data) == 0) {
+   if(nrow(rv$rainfall_data) == 0) {
     #### sprintf is our friend
-    paste("No rainfall data found for", input$smp_id, "from",
-          input$daterange[1], "to", input$daterange[2], ".")}
-  else {
-    paste("Rainfall data for", input$smp_id, "from",input$daterange[1],
-          "to", input$daterange[2], "has been generated.")
+     rv$rainfall_header <- paste("No rainfall data found for", input$smp_id, "from",
+                                 input$daterange[1], "to", input$daterange[2], ".")
+     } else {
+       rv$rainfall_header <- paste("Rainfall data for", input$smp_id, "from", 
+                                   input$daterange[1],"to", input$daterange[2],
+                                   "has been generated.")
     }
   # Render header
   output$rainfall_title <- renderText(rv$rainfall_header)
@@ -226,8 +225,9 @@ server <- function(input, output, session){
     }
   })
   
-  #2.4 download rainfall ------
-  #when you click "download rainfall"
+  # Download rainfall CSV file
+  #### The download file should be one function/chunks for both data types.
+  # Observe clicking download button
   output$dl_rainfall <- downloadHandler(
     filename = function(){
       paste(input$smp_id, input$daterange[1], "to", input$daterange[2], "rainfall.csv", sep = "_")
@@ -238,18 +238,21 @@ server <- function(input, output, session){
     }
   )
   
-  
-  #2.5 click "get baro data" button ----
+  # Observe Get Baro data button
+  #### Should be just get data, which downloads the file or gives soft error
   observeEvent(input$baro_data, {
+    barodata <- marsFetchBaroData(con = poolConn,
+                                     target_id = input$smp_id, 
+                                     start_date = rv$start_date(), 
+                                     end_date = rv$end_date(), 
+                                     data_interval = rv$interval()
+    )
+    glimpse(barodata)
+    rv$barodata <- barodata |> 
+      mutate(dtime = with_tz(dtime, tz = "EST"))
     
-    #fetch baro data
-    #why is it only getting first day ugh 
-    rv$barodata <- marsFetchBaroData(con = poolConn, 
-                                  target_id = input$smp_id, 
-                                  start_date = rv$start_date(), 
-                                  end_date = rv$end_date(), 
-                                  data_interval = rv$interval()
-    ) 
+    NY <<- barodata
+    EST <<- rv$barodata
     
     rv$baro_header <-  paste("Barometric pressure data found for", input$smp_id, "from", input$daterange[1], "to", input$daterange[2], " has been generated.")
     
