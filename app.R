@@ -174,7 +174,6 @@ server <- function(input, output, session){
       output$rainfall_title <- renderText("")
       }
     })
-  
   # Add "mins" to the interval
   rv$interval <- reactive(paste(input$interval, "mins"))
   
@@ -194,37 +193,44 @@ server <- function(input, output, session){
   # Get rainfall data
   # Observe clicked rainfall_data button
   observeEvent(input$rainfall_data, {
-  #### Does this need to be stored in a reactiveValues()?
-  rainfall_data <- marsFetchRainfallData(con = poolConn, 
+    # Catch error from marsFetchRainfallData
+    tryCatch(rv$rainfall_data <- marsFetchRainfallData(con = poolConn, 
                                          target_id = input$smp_id, 
                                          source = "gage",
                                          start_date = input$daterange[1], 
                                          end_date = input$daterange[2], 
-                                         daylightsavings = input$dst)
-  
-  # Moving America/New_York to EST to match baro CSV files for QAQC
-  rv$rainfall_data <- rainfall_data |> 
-    mutate(dtime = with_tz(dtime, tz = "EST"))
-  
-  # Update header depending on whether rainfall generated properly
-  #### This should be one button with an error message to alert the user
-   if(nrow(rv$rainfall_data) == 0) {
-    #### sprintf is our friend
-     rv$rainfall_header <- paste("No rainfall data found for", input$smp_id, "from",
-                                 input$daterange[1], "to", input$daterange[2], ".")
-     } else {
-       rv$rainfall_header <- paste("Rainfall data for", input$smp_id, "from", 
-                                   input$daterange[1],"to", input$daterange[2],
-                                   "has been generated.")
-    }
-  # Render header
-  output$rainfall_title <- renderText(rv$rainfall_header)
-  # Enable download button if rainfall data has at least 1 observation
-  if(nrow(rv$rainfall_data) > 0){
+                                         daylightsavings = input$dst),
+             error = function(e) {
+               rv$rainfall_data <- NULL
+               showModal(
+                 modalDialog(
+                   title = "No available data",
+                   easy_close = TRUE,
+                   "There is no data available for this date range"
+                   )
+               )
+              })
+  # If rv$rainfall exists
+  if(!is.null(rv$rainfall_data)) {
+    # Moving America/New_York to EST to match baro CSV files for QAQC
+    rv$rainfall_data <- rv$rainfall_data |>
+      mutate(dtime = with_tz(dtime, tz = "EST"))
+    rv$rainfall_header <- paste("Rainfall data for", input$smp_id, "from",
+                                input$daterange[1],"to", input$daterange[2],
+                                "has been generated.")
+    # Enable download button
     enable("dl_rainfall")
+  } else {
+    # Make sure download is disabled
+    disable("dl_rainfall")
+    rv$rainfall_header <- paste("No Rainfall data for", input$smp_id, "from",
+                                input$daterange[1],"to", input$daterange[2],
+                                "is available.")
+    # Render header
+    output$rainfall_title <- renderText(rv$rainfall_header)
     }
   })
-  
+
   # Download rainfall CSV file
   #### The download file should be one function/chunks for both data types.
   # Observe clicking download button
@@ -232,41 +238,54 @@ server <- function(input, output, session){
     filename = function(){
       paste(input$smp_id, input$daterange[1], "to", input$daterange[2], "rainfall.csv", sep = "_")
     },
-    
+
     content = function(file){
       write.csv(rv$rainfall_data, file)
     }
   )
-  
+
   # Observe Get Baro data button
   #### Should be just get data, which downloads the file or gives soft error
+  # Catch error from marsFetchBaroData
   observeEvent(input$baro_data, {
-    barodata <- marsFetchBaroData(con = poolConn,
+    tryCatch(rv$baro_data <- marsFetchBaroData(con = poolConn,
                                      target_id = input$smp_id, 
                                      start_date = rv$start_date(), 
                                      end_date = rv$end_date(), 
-                                     data_interval = rv$interval()
-    )
-    glimpse(barodata)
-    rv$barodata <- barodata |> 
-      mutate(dtime = with_tz(dtime, tz = "EST"))
-    
-    NY <<- barodata
-    EST <<- rv$barodata
-    
-    rv$baro_header <-  paste("Barometric pressure data found for", input$smp_id, "from", input$daterange[1], "to", input$daterange[2], " has been generated.")
-    
-    #render header
-    output$baro_title <- renderText(
-      rv$baro_header
-    )
-    
-   # enable("dl_baro_report")
-    enable("dl_baro_data")
-    
+                                     data_interval = rv$interval()),
+             error = function(e) {
+               rv$baro_data <- NULL
+               showModal(
+                 modalDialog(
+                   title = "No available data",
+                   easy_close = TRUE,
+                   "There is no avaiable data for this date range"
+                 )
+               )
+             })
+    # If baro_data returns 1+ observations
+    if(!is.null(rv$baro_data)) {
+      rv$barodata <- rv$baro_data |>
+        # Change time zone to EST for QAQC
+        mutate(dtime = with_tz(dtime, tz = "EST"))
+      rv$baro_header <-  paste("Barometric pressure data found for", input$smp_id, "from", input$daterange[1], "to", input$daterange[2], " has been generated.")
+
+      # render header
+      output$baro_title <- renderText(rv$baro_header)
+      # Enable download button
+      enable("dl_baro_data")
+    } else {
+      # Make sure download is disabled
+      disable("dl_baro_data")
+      rv$baro_header <- paste("No baro data for", input$smp_id, "from",
+                                  input$daterange[1],"to", input$daterange[2],
+                                  "is available.")
+      # Render header
+      output$baro_title <- renderText(rv$baro_header)
+    }
   })
   
-  #2.6 download baro data -----
+  # Download baro data
   output$dl_baro_data <- downloadHandler(
     filename = function(){
       paste(input$smp_id, input$daterange[1], "to", input$daterange[2], "baro.csv", sep = "_")
@@ -276,10 +295,6 @@ server <- function(input, output, session){
       write.csv(rv$barodata, file)
     }
   )
-  
-  
 }
 
-#3.0 shiny runApp --------           
-#Run this function to run the app!
 shinyApp(ui, server)    
