@@ -1,0 +1,12 @@
+name: dtime_-_shinydownloadtools
+title: dtime - shinyDownloadTools
+username: Jonathan.Bryant
+account: Jonathan.Bryant
+server: pwdrstudio.phila.gov
+hostUrl: https://pwdrstudio.phila.gov/__api__
+appId: 492
+bundleId: 3251
+url: https://pwdrstudio.phila.gov/content/3cb61a7c-eb14-40e0-8ae4-491bb89b9f4e/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
