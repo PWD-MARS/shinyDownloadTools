@@ -63,10 +63,7 @@ ui <- fluidPage(theme = shinytheme("cerulean"),
                   verbatimTextOutput("res"),
                   conditionalPanel(condition = 'input.data_type == 2',
                     selectInput("interval", "Interval (min)", choices = c("", 5, 15), selected = NULL)
-                    ), 
-                  conditionalPanel(condition = 'input.data_type == 1', 
-                    checkboxInput("dst", "Daylight Saving (leave unchecked if doing QA/QC)")
-                    ), 
+                    ),
                   conditionalPanel(condition = 'input.data_type == 1', 
                     actionButton("rainfall_data", "Get Rainfall Data"), 
                     disabled(downloadButton("dl_rainfall", "Download Rainfall .csv"))
@@ -199,7 +196,7 @@ server <- function(input, output, session){
                                          source = "gage",
                                          start_date = input$daterange[1], 
                                          end_date = input$daterange[2], 
-                                         daylightsavings = input$dst),
+                                         daylightsavings = FALSE),
              error = function(e) {
                rv$rainfall_data <- NULL
                showModal(
