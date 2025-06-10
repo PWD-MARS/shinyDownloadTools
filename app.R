@@ -39,9 +39,6 @@ max_baro_date <- as.Date(odbc::dbGetQuery(poolConn, paste0("SELECT max(dtime) FR
 #### Why is this needed?
 max_date = max(c(max_rainfall_date, max_baro_date))
 
-NY <- NA
-EST <- NA
-
 
 # UI
 ui <- fluidPage(theme = shinytheme("cerulean"),
