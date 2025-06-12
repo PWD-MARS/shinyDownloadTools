@@ -208,7 +208,8 @@ server <- function(input, output, session){
   if(!is.null(rv$rainfall_data)) {
     # Moving America/New_York to EST to match baro CSV files for QAQC
     rv$rainfall_data <- rv$rainfall_data |>
-      mutate(dtime = with_tz(dtime, tz = "EST"))
+      mutate(dtime = with_tz(dtime, tz = "EST")) |>
+      select(dtime, rainfall_in, gage_uid, gage_event_uid)
     rv$rainfall_header <- paste("Rainfall data for", input$smp_id, "from",
                                 input$daterange[1],"to", input$daterange[2],
                                 "has been generated.")
